@@ -1,0 +1,6 @@
+{
+  "name": "TradeX",
+  "description": "Minimalist real-time market intelligence & trading terminal with SMC structure analysis, multi-timeframe confluence, and live quant analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
