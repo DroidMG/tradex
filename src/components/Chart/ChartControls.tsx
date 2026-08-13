@@ -21,11 +21,10 @@ export const ChartControls: React.FC = () => {
   const quickPills: { label: string; key: keyof typeof overlays }[] = [
     { label: 'EMA', key: 'ema' },
     { label: 'VWAP', key: 'vwap' },
-    { label: 'Bollinger', key: 'bollingerBands' },
-    { label: 'Supertrend', key: 'supertrend' },
     { label: 'Order Blocks', key: 'orderBlocks' },
-    { label: 'FVG', key: 'fvg' },
     { label: 'BOS/CHoCH', key: 'bos' },
+    { label: 'Candle Patterns 🕯️', key: 'candlestickPatterns' },
+    { label: 'Chart Patterns 📐', key: 'chartPatterns' },
   ];
 
   const technicalKeys: (keyof typeof overlays)[] = ['ema', 'vwap', 'bollingerBands', 'supertrend', 'pivotPoints', 'fibonacci', 'volume'];

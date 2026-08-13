@@ -623,22 +623,48 @@ export const TradingChart: React.FC = () => {
                 lineWidth: 1,
                 lineStyle: 1,
                 axisLabelVisible: false,
-                title: '',
+                title: `${cp.name} Boundary`,
               });
               if (pl) priceLinesRef.current.push(pl);
+            }
+
+            if (cp.targetPrice) {
+              const plTarget = candlestickSeriesRef.current?.createPriceLine({
+                price: cp.targetPrice,
+                color: '#10b981',
+                lineWidth: 1,
+                lineStyle: 3,
+                axisLabelVisible: false,
+                title: `Target: ${formatPrice(cp.targetPrice)}`,
+              });
+              if (plTarget) priceLinesRef.current.push(plTarget);
             }
           }
         });
       }
 
-      // Sort markers chronologically (mandatory for lightweight-charts)
-      markers.sort((a, b) => (a.time as number) - (b.time as number));
+      // Strictly deduplicate and merge markers sharing the same time stamp (prevent lightweight-charts setMarkers duplicate time error)
+      const markersMap = new Map<number, SeriesMarker<Time>>();
+      markers.forEach((m) => {
+        const timeNum = m.time as number;
+        const existing = markersMap.get(timeNum);
+        if (!existing) {
+          markersMap.set(timeNum, { ...m });
+        } else {
+          existing.text = `${existing.text} | ${m.text}`;
+          if (m.position === 'belowBar') existing.position = 'belowBar';
+        }
+      });
+
+      const uniqueMarkers = Array.from(markersMap.values()).sort(
+        (a, b) => (a.time as number) - (b.time as number)
+      );
 
       // Set markers on candlestick series safely
       try {
-        candlestickSeriesRef.current.setMarkers(markers);
-      } catch {
-        // Ignore duplicate time marker edge cases
+        candlestickSeriesRef.current.setMarkers(uniqueMarkers);
+      } catch (err) {
+        console.warn('Failed to set chart markers:', err);
       }
     });
   }, []);
@@ -712,6 +738,16 @@ export const TradingChart: React.FC = () => {
             <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
               ACTIVE FVGs: <span className="text-cyan-400 font-bold">{smc.fairValueGaps.length}</span>
             </div>
+            {tradingStore.overlayToggles.candlestickPatterns && (
+              <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-emerald-500/30 text-emerald-300 backdrop-blur shadow-sm">
+                CANDLE PATTERNS: <span className="font-bold">{tradingStore.candlestickPatterns.length}</span>
+              </div>
+            )}
+            {tradingStore.overlayToggles.chartPatterns && (
+              <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-indigo-500/30 text-indigo-300 backdrop-blur shadow-sm">
+                CHART PATTERNS: <span className="font-bold">{tradingStore.chartPatterns.length}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

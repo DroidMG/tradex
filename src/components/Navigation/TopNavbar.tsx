@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -16,11 +16,21 @@ import {
   X,
 } from 'lucide-react';
 import { tradingStore, MainTab } from '../../store/tradingStore';
+import { getClassificationColor } from '../../services/fearAndGreedService';
 
 export const TopNavbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    return tradingStore.subscribe(() => setTick((t) => t + 1));
+  }, []);
 
   const activeTab = tradingStore.activeTab;
+  const fng = tradingStore.fearAndGreed;
+  const fngValue = fng ? fng.value : 29;
+  const fngClassification = fng ? fng.classification : 'Fear';
+  const fngColors = getClassificationColor(fngValue);
 
   const navItems: { id: MainTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
@@ -92,10 +102,12 @@ export const TopNavbar: React.FC = () => {
         {/* Right: Actions & Utilities */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Fear & Greed Badge */}
-          <div className="hidden md:flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg text-xs font-medium text-amber-300">
-            <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-            <span>Fear & Greed:</span>
-            <span className="font-bold text-amber-400">74 (Greed)</span>
+          <div className={`hidden md:flex items-center gap-1.5 ${fngColors.bg} border ${fngColors.border} px-2.5 py-1 rounded-lg text-xs font-medium text-slate-200 transition-colors`}>
+            <Flame className={`w-3.5 h-3.5 ${fngColors.text}`} />
+            <span className="text-slate-400">Fear & Greed:</span>
+            <span className={`font-bold ${fngColors.text}`}>
+              {fngValue} ({fngClassification})
+            </span>
           </div>
 
           {/* Live Data Stream Status Badge */}

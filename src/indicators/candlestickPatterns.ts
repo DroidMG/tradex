@@ -17,8 +17,8 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
   const patterns: CandlestickPatternResult[] = [];
   const len = candles.length;
 
-  // We scan the recent candles (e.g. last 100)
-  const startIdx = Math.max(0, len - 100);
+  // Scan recent candles (last 120 candles)
+  const startIdx = Math.max(0, len - 120);
 
   for (let i = startIdx + 2; i < len; i++) {
     const prev2 = candles[i - 2];
@@ -35,6 +35,11 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
     const isBullPrev1 = prev1.close >= prev1.open;
     const isBearPrev1 = prev1.close < prev1.open;
 
+    const bodyPrev2 = Math.abs(prev2.close - prev2.open);
+    const rangePrev2 = prev2.high - prev2.low;
+    const isBearPrev2 = prev2.close < prev2.open;
+    const isBullPrev2 = prev2.close >= prev2.open;
+
     const upperWickCurr = isBullCurr ? curr.high - curr.close : curr.high - curr.open;
     const lowerWickCurr = isBullCurr ? curr.open - curr.low : curr.close - curr.low;
 
@@ -43,7 +48,7 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
     // 1. Hammer (Bullish Reversal)
     if (
       lowerWickCurr >= bodyCurr * 2 &&
-      upperWickCurr <= bodyCurr * 0.5 &&
+      upperWickCurr <= bodyCurr * 0.6 &&
       bodyCurr / rangeCurr <= 0.35 &&
       isBearPrev1
     ) {
@@ -54,15 +59,34 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name: 'Hammer',
         type: 'Bullish',
         significance: 'High',
-        description: 'Strong bullish rejection of lower prices after a downtrend.',
+        description: 'Bullish rejection of lower prices with a long lower wick.',
         candlePrice: curr.low,
       });
     }
 
-    // 2. Shooting Star (Bearish Reversal)
+    // 2. Inverted Hammer (Bullish Reversal)
     if (
       upperWickCurr >= bodyCurr * 2 &&
-      lowerWickCurr <= bodyCurr * 0.5 &&
+      lowerWickCurr <= bodyCurr * 0.6 &&
+      bodyCurr / rangeCurr <= 0.35 &&
+      isBearPrev1
+    ) {
+      patterns.push({
+        id: `inv-hammer-${curr.time}`,
+        index: i,
+        time: curr.time,
+        name: 'Inverted Hammer',
+        type: 'Bullish',
+        significance: 'Medium',
+        description: 'Buyers tested higher prices after downtrend; potential reversal.',
+        candlePrice: curr.low,
+      });
+    }
+
+    // 3. Shooting Star (Bearish Reversal)
+    if (
+      upperWickCurr >= bodyCurr * 2 &&
+      lowerWickCurr <= bodyCurr * 0.6 &&
       bodyCurr / rangeCurr <= 0.35 &&
       isBullPrev1
     ) {
@@ -73,18 +97,18 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name: 'Shooting Star',
         type: 'Bearish',
         significance: 'High',
-        description: 'Strong bearish rejection of higher prices at resistance.',
+        description: 'Bearish rejection of higher prices at resistance.',
         candlePrice: curr.high,
       });
     }
 
-    // 3. Bullish Engulfing
+    // 4. Bullish Engulfing (Adapted for 24/7 continuous crypto markets)
     if (
       isBearPrev1 &&
       isBullCurr &&
-      curr.close > prev1.open &&
-      curr.open < prev1.close &&
-      bodyCurr > bodyPrev1
+      curr.close >= prev1.open &&
+      curr.low <= prev1.low &&
+      bodyCurr >= bodyPrev1 * 0.85
     ) {
       patterns.push({
         id: `bull-engulf-${curr.time}`,
@@ -93,18 +117,18 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name: 'Bullish Engulfing',
         type: 'Bullish',
         significance: 'High',
-        description: 'Buyers completely override previous candle selling pressure.',
+        description: 'Strong buyers completely overrun prior selling candle.',
         candlePrice: curr.low,
       });
     }
 
-    // 4. Bearish Engulfing
+    // 5. Bearish Engulfing (Adapted for 24/7 continuous crypto markets)
     if (
       isBullPrev1 &&
       isBearCurr &&
-      curr.close < prev1.open &&
-      curr.open > prev1.close &&
-      bodyCurr > bodyPrev1
+      curr.close <= prev1.open &&
+      curr.high >= prev1.high &&
+      bodyCurr >= bodyPrev1 * 0.85
     ) {
       patterns.push({
         id: `bear-engulf-${curr.time}`,
@@ -113,15 +137,15 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name: 'Bearish Engulfing',
         type: 'Bearish',
         significance: 'High',
-        description: 'Sellers completely engulf previous candle bullish movement.',
+        description: 'Sellers completely overwhelm prior bullish candle body.',
         candlePrice: curr.high,
       });
     }
 
-    // 5. Doji (Indecision / Pivot)
-    if (bodyCurr / rangeCurr <= 0.1) {
-      const isDragonfly = lowerWickCurr >= rangeCurr * 0.7;
-      const isGravestone = upperWickCurr >= rangeCurr * 0.7;
+    // 6. Doji (Dragonfly & Gravestone)
+    if (bodyCurr / rangeCurr <= 0.12) {
+      const isDragonfly = lowerWickCurr >= rangeCurr * 0.65;
+      const isGravestone = upperWickCurr >= rangeCurr * 0.65;
 
       let name = 'Doji';
       let type: 'Bullish' | 'Bearish' | 'Neutral' = 'Neutral';
@@ -141,18 +165,18 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name,
         type,
         significance: 'Medium',
-        description: 'Market indecision and potential trend reversal point.',
+        description: 'Extreme equilibrium between buyers and sellers.',
         candlePrice: curr.close,
       });
     }
 
-    // 6. Morning Star (3-Candle Bullish Reversal)
+    // 7. Morning Star (3-Candle Bottom Reversal)
     if (
-      isBearPrev1 &&
-      prev1.close < prev2.close &&
-      bodyPrev1 / rangePrev1 <= 0.3 &&
+      isBearPrev2 &&
+      bodyPrev2 / rangePrev2 > 0.4 &&
+      bodyPrev1 / rangePrev1 <= 0.35 &&
       isBullCurr &&
-      curr.close > (prev2.open + prev2.close) / 2
+      curr.close >= (prev2.open + prev2.close) / 2
     ) {
       patterns.push({
         id: `morning-star-${curr.time}`,
@@ -161,18 +185,18 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name: 'Morning Star',
         type: 'Bullish',
         significance: 'High',
-        description: 'Classic 3-candle bottom reversal setup.',
+        description: 'Classic 3-candle bottom reversal structure.',
         candlePrice: curr.low,
       });
     }
 
-    // 7. Evening Star (3-Candle Bearish Reversal)
+    // 8. Evening Star (3-Candle Top Reversal)
     if (
-      isBullPrev1 &&
-      prev1.close > prev2.close &&
-      bodyPrev1 / rangePrev1 <= 0.3 &&
+      isBullPrev2 &&
+      bodyPrev2 / rangePrev2 > 0.4 &&
+      bodyPrev1 / rangePrev1 <= 0.35 &&
       isBearCurr &&
-      curr.close < (prev2.open + prev2.close) / 2
+      curr.close <= (prev2.open + prev2.close) / 2
     ) {
       patterns.push({
         id: `evening-star-${curr.time}`,
@@ -181,18 +205,18 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name: 'Evening Star',
         type: 'Bearish',
         significance: 'High',
-        description: 'Classic 3-candle top reversal setup.',
+        description: 'Classic 3-candle top reversal structure.',
         candlePrice: curr.high,
       });
     }
 
-    // 8. Bullish Harami
+    // 9. Bullish Harami (Inside Bar Contraction)
     if (
       isBearPrev1 &&
       isBullCurr &&
-      curr.high < prev1.open &&
-      curr.low > prev1.close &&
-      bodyCurr < bodyPrev1 * 0.5
+      curr.high <= prev1.high &&
+      curr.low >= prev1.low &&
+      bodyCurr <= bodyPrev1 * 0.6
     ) {
       patterns.push({
         id: `bull-harami-${curr.time}`,
@@ -201,18 +225,18 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name: 'Bullish Harami',
         type: 'Bullish',
         significance: 'Medium',
-        description: 'Inside-bar contraction indicating selling momentum exhaustion.',
+        description: 'Inside-bar contraction indicating downward momentum decay.',
         candlePrice: curr.low,
       });
     }
 
-    // 9. Bearish Harami
+    // 10. Bearish Harami (Inside Bar Contraction)
     if (
       isBullPrev1 &&
       isBearCurr &&
-      curr.high < prev1.close &&
-      curr.low > prev1.open &&
-      bodyCurr < bodyPrev1 * 0.5
+      curr.high <= prev1.high &&
+      curr.low >= prev1.low &&
+      bodyCurr <= bodyPrev1 * 0.6
     ) {
       patterns.push({
         id: `bear-harami-${curr.time}`,
@@ -221,59 +245,118 @@ export function detectCandlestickPatterns(candles: Candle[]): CandlestickPattern
         name: 'Bearish Harami',
         type: 'Bearish',
         significance: 'Medium',
-        description: 'Inside-bar contraction indicating buying momentum exhaustion.',
+        description: 'Inside-bar contraction indicating upward momentum decay.',
         candlePrice: curr.high,
       });
     }
 
-    // 10. Three White Soldiers
-    if (
-      isBullCurr &&
-      isBullPrev1 &&
-      prev2.close >= prev2.open &&
-      curr.close > prev1.close &&
-      prev1.close > prev2.close &&
-      bodyCurr > rangeCurr * 0.5 &&
-      bodyPrev1 > rangePrev1 * 0.5
-    ) {
+    // 11. Bullish Marubozu (Power Expansion)
+    if (isBullCurr && bodyCurr / rangeCurr >= 0.88 && rangeCurr > rangePrev1 * 1.1) {
       patterns.push({
-        id: `three-soldiers-${curr.time}`,
+        id: `bull-marubozu-${curr.time}`,
         index: i,
         time: curr.time,
-        name: 'Three White Soldiers',
+        name: 'Bullish Marubozu',
         type: 'Bullish',
         significance: 'High',
-        description: 'Powerful consecutive bullish expansion candles.',
+        description: 'Uninterrupted bullish momentum with minimal wicks.',
         candlePrice: curr.low,
       });
     }
 
-    // 11. Three Black Crows
-    if (
-      isBearCurr &&
-      isBearPrev1 &&
-      prev2.close < prev2.open &&
-      curr.close < prev1.close &&
-      prev1.close < prev2.close &&
-      bodyCurr > rangeCurr * 0.5 &&
-      bodyPrev1 > rangePrev1 * 0.5
-    ) {
+    // 12. Bearish Marubozu (Power Expansion)
+    if (isBearCurr && bodyCurr / rangeCurr >= 0.88 && rangeCurr > rangePrev1 * 1.1) {
       patterns.push({
-        id: `three-crows-${curr.time}`,
+        id: `bear-marubozu-${curr.time}`,
         index: i,
         time: curr.time,
-        name: 'Three Black Crows',
+        name: 'Bearish Marubozu',
         type: 'Bearish',
         significance: 'High',
-        description: 'Powerful consecutive bearish expansion candles.',
+        description: 'Uninterrupted bearish momentum with minimal wicks.',
+        candlePrice: curr.high,
+      });
+    }
+
+    // 13. Tweezer Bottom (Bullish Support Rejection)
+    if (
+      isBearPrev1 &&
+      isBullCurr &&
+      Math.abs(curr.low - prev1.low) / Math.max(curr.low, 0.0001) <= 0.0015
+    ) {
+      patterns.push({
+        id: `tweezer-bottom-${curr.time}`,
+        index: i,
+        time: curr.time,
+        name: 'Tweezer Bottom',
+        type: 'Bullish',
+        significance: 'High',
+        description: 'Matching double lows testing a key support level.',
+        candlePrice: curr.low,
+      });
+    }
+
+    // 14. Tweezer Top (Bearish Resistance Rejection)
+    if (
+      isBullPrev1 &&
+      isBearCurr &&
+      Math.abs(curr.high - prev1.high) / Math.max(curr.high, 0.0001) <= 0.0015
+    ) {
+      patterns.push({
+        id: `tweezer-top-${curr.time}`,
+        index: i,
+        time: curr.time,
+        name: 'Tweezer Top',
+        type: 'Bearish',
+        significance: 'High',
+        description: 'Matching double highs testing a key resistance level.',
+        candlePrice: curr.high,
+      });
+    }
+
+    // 15. Piercing Line (Bullish Reversal)
+    if (
+      isBearPrev1 &&
+      isBullCurr &&
+      curr.close >= (prev1.open + prev1.close) / 2 &&
+      curr.close < prev1.open
+    ) {
+      patterns.push({
+        id: `piercing-line-${curr.time}`,
+        index: i,
+        time: curr.time,
+        name: 'Piercing Line',
+        type: 'Bullish',
+        significance: 'High',
+        description: 'Bullish candle pierces deep into prior red candle body.',
+        candlePrice: curr.low,
+      });
+    }
+
+    // 16. Dark Cloud Cover (Bearish Reversal)
+    if (
+      isBullPrev1 &&
+      isBearCurr &&
+      curr.close <= (prev1.open + prev1.close) / 2 &&
+      curr.close > prev1.open
+    ) {
+      patterns.push({
+        id: `dark-cloud-${curr.time}`,
+        index: i,
+        time: curr.time,
+        name: 'Dark Cloud Cover',
+        type: 'Bearish',
+        significance: 'High',
+        description: 'Bearish candle pierces deep into prior green candle body.',
         candlePrice: curr.high,
       });
     }
   }
 
-  // Deduplicate and return last 15 detected patterns
+  // Deduplicate and return recent detected patterns
   const uniqueMap = new Map<string, CandlestickPatternResult>();
   patterns.forEach((p) => uniqueMap.set(`${p.name}-${p.time}`, p));
 
-  return Array.from(uniqueMap.values()).slice(-15);
+  return Array.from(uniqueMap.values()).slice(-20);
 }
+

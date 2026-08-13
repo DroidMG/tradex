@@ -13,6 +13,7 @@ import { evaluateSignal } from '../signals/signalEngine';
 import { analyzeMultiTimeframe } from '../signals/mtfAnalysis';
 import { CandlestickPatternResult, detectCandlestickPatterns } from '../indicators/candlestickPatterns';
 import { ChartPatternResult, detectChartPatterns } from '../indicators/chartPatterns';
+import { fetchFearAndGreedIndex, FearAndGreedData } from '../services/fearAndGreedService';
 
 export type MainTab =
   | 'dashboard'
@@ -109,23 +110,24 @@ class TradingStore {
   public marketRegime: MarketRegime | null = null;
   public currentSignal: SignalResult | null = null;
   public mtfResult: MTFAnalysisResult | null = null;
+  public fearAndGreed: FearAndGreedData | null = null;
 
   public chartType: 'candlestick' | 'heikinAshi' | 'line' = 'candlestick';
 
   public overlayToggles: ChartOverlayToggles = {
-    ema: false,
+    ema: true,
     vwap: false,
     bollingerBands: false,
     supertrend: false,
     pivotPoints: false,
     fibonacci: false,
-    candlestickPatterns: false,
-    chartPatterns: false,
-    orderBlocks: false,
+    candlestickPatterns: true,
+    chartPatterns: true,
+    orderBlocks: true,
     fvg: false,
     liquidity: false,
-    bos: false,
-    choch: false,
+    bos: true,
+    choch: true,
     supportResistance: false,
     sessionLevels: false,
     volume: true,
@@ -215,6 +217,17 @@ class TradingStore {
     this.loadPersistedConfig();
     this.initializeSymbol(this.selectedSymbol);
     this.startDataStream();
+    this.refreshFearAndGreed();
+    setInterval(() => this.refreshFearAndGreed(), 60000);
+  }
+
+  public async refreshFearAndGreed() {
+    try {
+      this.fearAndGreed = await fetchFearAndGreedIndex();
+      this.notify();
+    } catch (e) {
+      console.warn('Failed to refresh Fear & Greed:', e);
+    }
   }
 
   public subscribe(listener: StoreListener): () => void {
