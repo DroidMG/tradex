@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { MarketPressurePanel } from '../MarketPressurePanel';
 import {
   Plus,
   RotateCcw,
@@ -107,6 +108,7 @@ export const ProDashboard: React.FC = () => {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
             {[
+              { type: 'market_pressure', label: 'Buyer/Seller Power (Live)' },
               { type: 'market_cap', label: 'Market Cap' },
               { type: 'btc_dominance', label: 'BTC Dominance' },
               { type: 'fear_greed', label: 'Fear & Greed' },
@@ -169,6 +171,8 @@ export const ProDashboard: React.FC = () => {
 
               {/* Widget Body Content based on Type */}
               <div className="flex-1">
+                {widget.type === 'market_pressure' && <MarketPressurePanel />}
+
                 {widget.type === 'global_overview' && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl">

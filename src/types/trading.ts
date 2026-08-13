@@ -385,7 +385,8 @@ export type WidgetType =
   | 'recent_alerts'
   | 'ai_summary'
   | 'derivatives_quick'
-  | 'whale_feed_quick';
+  | 'whale_feed_quick'
+  | 'market_pressure';
 
 export interface DashboardWidget {
   id: string;

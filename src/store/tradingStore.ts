@@ -69,6 +69,7 @@ export type StoreListener = () => void;
 
 const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: 'w-1', type: 'global_overview', title: 'Global Market Intelligence', colSpan: 4 },
+  { id: 'w-pressure', type: 'market_pressure', title: 'Institutional Buyer vs. Seller Power (Real-time 1s)', colSpan: 4 },
   { id: 'w-2', type: 'ai_summary', title: 'Executive Market Intelligence Brief', colSpan: 2 },
   { id: 'w-3', type: 'fear_greed', title: 'Fear & Greed Index', colSpan: 2 },
   { id: 'w-4', type: 'market_cap', title: 'Total Crypto Market Cap', colSpan: 1 },
@@ -112,20 +113,20 @@ class TradingStore {
   public chartType: 'candlestick' | 'heikinAshi' | 'line' = 'candlestick';
 
   public overlayToggles: ChartOverlayToggles = {
-    ema: true,
-    vwap: true,
+    ema: false,
+    vwap: false,
     bollingerBands: false,
-    supertrend: true,
+    supertrend: false,
     pivotPoints: false,
     fibonacci: false,
-    candlestickPatterns: true,
-    chartPatterns: true,
-    orderBlocks: true,
-    fvg: true,
-    liquidity: true,
-    bos: true,
-    choch: true,
-    supportResistance: true,
+    candlestickPatterns: false,
+    chartPatterns: false,
+    orderBlocks: false,
+    fvg: false,
+    liquidity: false,
+    bos: false,
+    choch: false,
+    supportResistance: false,
     sessionLevels: false,
     volume: true,
   };
@@ -289,6 +290,13 @@ class TradingStore {
     this.notify();
   }
 
+  public clearAllOverlays() {
+    (Object.keys(this.overlayToggles) as (keyof ChartOverlayToggles)[]).forEach((k) => {
+      this.overlayToggles[k] = false;
+    });
+    this.notify();
+  }
+
   public updateIndicatorConfig(newConfig: Partial<IndicatorConfig>) {
     this.indicatorConfig = { ...this.indicatorConfig, ...newConfig };
     this.savePersistedConfig();
@@ -413,7 +421,8 @@ class TradingStore {
     this.smcAnalysis = analyzeSMC(candles, this.selectedTimeframe);
     this.candlestickPatterns = detectCandlestickPatterns(candles);
     this.chartPatterns = detectChartPatterns(candles, this.smcAnalysis.swings);
-    this.marketPressure = calculateMarketPressure(candles, this.indicatorValues, this.smcAnalysis);
+    const tick = this.ticks.get(this.selectedSymbol);
+    this.marketPressure = calculateMarketPressure(candles, this.indicatorValues, this.smcAnalysis, tick);
     this.marketRegime = calculateMarketRegime(candles, this.indicatorValues);
     this.currentSignal = evaluateSignal(
       this.selectedSymbol,
@@ -436,8 +445,11 @@ class TradingStore {
       this.prevPrices.set(tick.symbol, tick.last);
       this.ticks.set(tick.symbol, tick);
 
-      if (tick.symbol === this.selectedSymbol && this.aggregator) {
-        this.aggregator.processTick(tick, [this.selectedTimeframe]);
+      if (tick.symbol === this.selectedSymbol) {
+        if (this.aggregator) {
+          this.aggregator.processTick(tick, [this.selectedTimeframe]);
+        }
+        this.recalculateAll();
       }
 
       this.notify();
