@@ -3,7 +3,7 @@ import { INITIAL_ASSETS } from '../data/assets';
 import { generateHistoricalCandles } from '../data/mockHistorical';
 import { MarketDataProvider } from '../services/providers/MarketDataProvider';
 import { DemoProvider } from '../services/providers/DemoProvider';
-import { CoinGeckoProvider } from '../services/providers/CoinGeckoProvider';
+import { RealtimeLiveProvider } from '../services/providers/RealtimeLiveProvider';
 import { CandleAggregator } from '../services/CandleAggregator';
 import { calculateAllIndicators } from '../indicators/indicatorsEngine';
 import { analyzeSMC } from '../smc/smcEngine';
@@ -93,7 +93,7 @@ class TradingStore {
   public refreshIntervalSec = 1; // 1s live
 
   public isDemoMode = false;
-  public provider: MarketDataProvider = new CoinGeckoProvider();
+  public provider: MarketDataProvider = new RealtimeLiveProvider();
 
   public ticks: Map<string, MarketTick> = new Map();
   public priceFlashes: Map<string, 'up' | 'down' | null> = new Map();
@@ -263,7 +263,7 @@ class TradingStore {
     if (enableDemo) {
       this.provider = new DemoProvider();
     } else {
-      this.provider = new CoinGeckoProvider();
+      this.provider = new RealtimeLiveProvider();
     }
 
     this.startDataStream();
