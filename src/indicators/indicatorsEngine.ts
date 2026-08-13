@@ -267,6 +267,118 @@ export function calculateRVOL(candles: Candle[], period = 20): (number | null)[]
   });
 }
 
+export interface SupertrendPoint {
+  value: number;
+  direction: 'up' | 'down';
+}
+
+export function calculateSupertrend(
+  candles: Candle[],
+  period = 10,
+  multiplier = 3
+): (SupertrendPoint | null)[] {
+  const atr = calculateATR(candles, period);
+  const result: (SupertrendPoint | null)[] = new Array(candles.length).fill(null);
+
+  let prevUpper = 0;
+  let prevLower = 0;
+  let prevSupertrend = 0;
+  let prevDirection: 'up' | 'down' = 'up';
+
+  for (let i = 0; i < candles.length; i++) {
+    const atrVal = atr[i];
+    if (atrVal === null) continue;
+
+    const hl2 = (candles[i].high + candles[i].low) / 2;
+    let basicUpper = hl2 + multiplier * atrVal;
+    let basicLower = hl2 - multiplier * atrVal;
+
+    let finalUpper =
+      i > 0 && basicUpper < prevUpper || (i > 0 && candles[i - 1].close > prevUpper)
+        ? basicUpper
+        : prevUpper;
+    let finalLower =
+      i > 0 && basicLower > prevLower || (i > 0 && candles[i - 1].close < prevLower)
+        ? basicLower
+        : prevLower;
+
+    let direction: 'up' | 'down' = prevDirection;
+    if (prevSupertrend === prevUpper) {
+      direction = candles[i].close > finalUpper ? 'up' : 'down';
+    } else {
+      direction = candles[i].close < finalLower ? 'down' : 'up';
+    }
+
+    const supertrendVal = direction === 'up' ? finalLower : finalUpper;
+
+    result[i] = { value: supertrendVal, direction };
+
+    prevUpper = finalUpper;
+    prevLower = finalLower;
+    prevSupertrend = supertrendVal;
+    prevDirection = direction;
+  }
+
+  return result;
+}
+
+export interface PivotPoints {
+  pivot: number;
+  r1: number;
+  s1: number;
+  r2: number;
+  s2: number;
+  r3: number;
+  s3: number;
+}
+
+export function calculatePivotPoints(candles: Candle[]): PivotPoints | null {
+  if (candles.length < 20) return null;
+  const slice = candles.slice(-20);
+  const high = Math.max(...slice.map((c) => c.high));
+  const low = Math.min(...slice.map((c) => c.low));
+  const close = slice[slice.length - 1].close;
+
+  const p = (high + low + close) / 3;
+  return {
+    pivot: p,
+    r1: 2 * p - low,
+    s1: 2 * p - high,
+    r2: p + (high - low),
+    s2: p - (high - low),
+    r3: high + 2 * (p - low),
+    s3: low - 2 * (high - p),
+  };
+}
+
+export interface FibonacciLevels {
+  high: number;
+  low: number;
+  fib236: number;
+  fib382: number;
+  fib500: number;
+  fib618: number;
+  fib786: number;
+}
+
+export function calculateFibonacciLevels(candles: Candle[]): FibonacciLevels | null {
+  if (candles.length < 20) return null;
+  const slice = candles.slice(-50);
+  const high = Math.max(...slice.map((c) => c.high));
+  const low = Math.min(...slice.map((c) => c.low));
+  const diff = high - low;
+
+  return {
+    high,
+    low,
+    fib236: high - diff * 0.236,
+    fib382: high - diff * 0.382,
+    fib500: high - diff * 0.5,
+    fib618: high - diff * 0.618,
+    fib786: high - diff * 0.786,
+  };
+}
+
 /**
  * Master Indicator Calculator for latest values
  */
@@ -349,6 +461,10 @@ export function calculateAllIndicators(
         }
       : null;
 
+  // Supertrend
+  const stSeries = calculateSupertrend(candles, config.supertrendPeriod, config.supertrendMultiplier);
+  const stLast = stSeries[lastIdx];
+
   // OBV
   const obvSeries = calculateOBV(candles);
   const obvVal = obvSeries[lastIdx];
@@ -367,7 +483,7 @@ export function calculateAllIndicators(
     atr: atrVal,
     adx: adxVal,
     bollingerBands: bbVal,
-    supertrend: { value: closes[lastIdx] * 0.98, direction: 'up' },
+    supertrend: stLast ? { value: Number(stLast.value.toFixed(2)), direction: stLast.direction } : null,
     obv: obvVal,
     relativeVolume: rvolVal,
   };

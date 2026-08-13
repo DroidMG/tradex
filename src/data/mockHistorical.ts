@@ -40,7 +40,10 @@ export function generateHistoricalCandles(
 ): Candle[] {
   const basePrice = BASE_PRICES[symbol] || 100;
   const stepSec = TIMEFRAME_SECONDS[timeframe] || 300;
-  const now = Math.floor(Date.now() / 1000);
+  
+  // Align now to exact timeframe step boundary so historical and live tick candles align seamlessly
+  const rawNow = Math.floor(Date.now() / 1000);
+  const now = Math.floor(rawNow / stepSec) * stepSec;
   
   // Base volatility per candle depending on asset & timeframe
   let volFactor = 0.002;
@@ -51,7 +54,7 @@ export function generateHistoricalCandles(
   const candles: Candle[] = [];
   let currentPrice = basePrice * (1 - volFactor * Math.sqrt(count) * 0.3);
 
-  const startTime = now - count * stepSec;
+  const startTime = now - (count - 1) * stepSec;
 
   for (let i = 0; i < count; i++) {
     const time = startTime + i * stepSec;

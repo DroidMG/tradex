@@ -31,8 +31,6 @@ export const CommandPalette: React.FC = () => {
         } else {
           document.exitFullscreen();
         }
-      } else if (e.key.toLowerCase() === 't') {
-        tradingStore.setTheme(tradingStore.theme === 'dark' ? 'light' : 'dark');
       }
     };
 

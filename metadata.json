@@ -1,6 +1,6 @@
 {
   "name": "TradeX",
-  "description": "Minimalist real-time market intelligence & trading terminal with SMC structure analysis, multi-timeframe confluence, and live quant analytics.",
+  "description": "Professional Crypto Analysis & Intelligence Platform with customizable Pro Dashboards, On-Chain Intelligence, Derivatives Terminal, Whale Tracking, Backtesting, Paper Trading, AI Research, and Risk Analytics.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

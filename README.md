@@ -1,112 +1,66 @@
-# Professional Real-Time Trading Intelligence Terminal
+# TradeX Pro Intelligence — Crypto Analysis & Intelligence Platform
 
-An institutional-grade financial market analysis and real-time trading intelligence dashboard designed for high performance, Smart Money Concepts (SMC) structure detection, multi-timeframe confluence analysis, and strategy backtesting.
+TradeX Pro Intelligence is a web-based Crypto Analysis & Intelligence Platform built for serious crypto traders, investors, quantitative analysts, and researchers.
 
-![Terminal Preview](https://raw.githubusercontent.com/trading-terminal/preview.png)
-
-## 🌟 Key Features
-
-- **Multi-Asset Registry**: Supports BTC/USD, ETH/USD, SOL/USD, XAU/USD (Gold), EUR/USD, GBP/USD, USD/JPY, NASDAQ (US100 CFD), S&P 500 (US500 CFD), Dow Jones (US30 CFD), WTI Crude Oil, Silver (XAG/USD), and easily extendable custom symbols.
-- **Provider Abstraction Architecture**: Normalizes streaming ticks across CoinGecko API, Forex feeds, CFD providers, and high-frequency Demo stochastic walk streams.
-- **TradingView Lightweight Charts Integration**: High-density interactive candlestick charts with volume histogram, crosshairs, zoom/pan, real-time incremental candle updates, and custom SMC overlays.
-- **Smart Money Concepts (SMC) Engine**:
-  - Swing Points (HH, HL, LH, LL)
-  - Break of Structure (BOS) & Change of Character (CHoCH)
-  - Order Blocks (OB) with strength, freshness, and touch tracking
-  - Fair Value Gaps (FVG) with size and fill percentage
-  - Liquidity Sweeps (Equal Highs/Lows, PDH/PDL, Session Highs/Lows)
-  - Premium / Discount Dealing Range (50% Equilibrium Line)
-- **Institutional Market Pressure Score**: Explainable Buyer vs. Seller Power gauge (0-100) computed from momentum, volume, market structure, VWAP, RSI, and liquidity sweeps.
-- **Quant Confluence Signal Engine**: Composite confidence score (0-100) producing `BULLISH BIAS`, `BEARISH BIAS`, or `NO CLEAR EDGE`.
-- **Trade Setup Generator**: Automatic Long/Short trade scenarios with Entry Zone, Stop Loss, Take Profit 1 & 2, Risk/Reward ratio, and invalidation risk warnings.
-- **Multi-Timeframe Analysis**: Parallel 5M, 15M, 1H, 4H, 1D matrix comparing trends, structures, momentum, and overall alignment.
-- **Strategy Backtesting Module**: Evaluates win rate, profit factor, expectancy, Sharpe ratio, Sortino ratio, max drawdown, and equity growth curves.
-- **Command Palette & Keyboard Shortcuts**:
-  - `/` -> Search asset / Command palette
-  - `1-5` -> Quick timeframe selection (1m, 5m, 15m, 1H, 4H)
-  - `F` -> Fullscreen chart mode
-  - `T` -> Theme toggle
+Made With ❤️ By DroidMG. Proudly Made In India 🇮🇳
 
 ---
 
-## 🏗 Data Provider Architecture
+## 🚀 Platform Modules & Core Features
 
-```
-Market Data Providers
-   ├── CoinGeckoProvider (Crypto Live Feed)
-   ├── ForexProvider (XAU/USD, EUR/USD, GBP/USD)
-   ├── CFDProvider (US100, US500, US30, WTI)
-   └── DemoProvider (Sub-second stochastic walk simulation)
-            ↓
-   Normalized MarketTick Stream
-            ↓
-     CandleAggregator
-            ↓
-  Technical Indicators + SMC Engine
-            ↓
-   Institutional Terminal UI
-```
+### 1. 📊 Pro Customizable Dashboard
+- **Drag-and-Drop / Customizable Widgets**: Add, remove, resize, and rearrange widgets for Total Market Cap, BTC/ETH Dominance, Stablecoin Cap, Fear & Greed Index, Sector Performance, Top Gainers/Losers, Portfolio P&L, Recent Alerts, and AI Market Summaries.
+- **Saved Layouts & Refresh Controls**: Switch between dark, light, and terminal matrix themes; set live refresh intervals (1s, 5s, 15s, 30s).
 
-Every provider normalizes tick outputs into the standard internal structure:
+### 2. 📈 Advanced Market Data & Asset Screener
+- **Comprehensive Asset Coverage**: Track BTC, ETH, SOL, L1s, L2s, DeFi, AI, DePIN, Memes, RWA, and Stablecoins.
+- **Deep Metrics**: Real-time Price, 1h/24h/7d/30d changes, Market Cap, Fully Diluted Valuation (FDV), Circulating & Total Supply, Volume/Market Cap ratio, ATH/ATL distances, Liquidity rank, and Exchange availability.
 
-```ts
-interface MarketTick {
-  symbol: string;
-  timestamp: number;
-  bid: number;
-  ask: number;
-  last: number;
-  change24h: number;
-  changePercent24h: number;
-  volume: number;
-  high24h: number;
-  low24h: number;
-  source: string;
-  spread: number;
-}
-```
+### 3. 📉 Professional Charting & Technical Analysis
+- **Chart Styles**: Candlestick, OHLC, Line, Area, Heikin-Ashi, and Renko chart visualizations.
+- **13 Timeframes**: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1D, 1W, 1M.
+- **20+ Technical Indicators**: Moving Average Ribbons, VWAP, Ichimoku Cloud, Supertrend, Bollinger Bands, RSI, MACD, Stochastic, ATR, ADX, CCI, OBV, MFI, Pivot Points, Fibonacci Retracements & Extensions, and Volume Profile.
+- **Smart Money Concepts (SMC)**: Automated Swing Points, Order Blocks, Fair Value Gaps, Liquidity Sweeps, and BOS/CHoCH detection.
 
----
+### 4. ⚡ Multi-Exchange Analysis & Order Book Microstructure
+- **Cross-Exchange Matrix**: Compare Spot vs Futures prices, Bid/Ask spreads, Funding rates, Open Interest, and Arbitrage basis across Binance, Coinbase, Bybit, OKX, Kraken, Uniswap, and KuCoin.
+- **Market Microstructure**: Live depth chart, Whale wall detection (> $100K orders), Buy/Sell Volume Pressure ratios, Order Book Imbalance %, and Real-time Aggressive Trade Flow streams.
 
-## 🛠 Local Setup & Development
+### 5. 🌐 On-Chain Intelligence & Whale Tracker
+- **On-Chain Metrics**: Active/New Addresses, Tx Volume, Network Gas Fees, Exchange Inflows/Outflows/Reserves, Stablecoin Netflows, MVRV Z-Score, SOPR, NVT Ratio, Realized Cap.
+- **Whale Intelligence**: Real-time $100K+ / $1M+ transaction feed, Wallet Profitability & Holdings tracking, Smart Money Leaderboard, Accumulation vs Distribution scores, and Custom Wallet Watchlists.
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/your-username/trading-terminal.git
-   cd trading-terminal
-   ```
+### 6. 🔓 Token Holders & Unlocks Calendar
+- **Holder Analysis**: Top 10/50/100 concentration %, Exchange vs Team vs Treasury vs Vesting supply distribution.
+- **Vesting Calendar**: Upcoming cliff & linear unlock events, USD value, supply %, recipient categories, and potential supply pressure indicators.
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+### 7. 🔮 Derivatives Terminal & Liquidation Heatmap
+- **Derivatives Analytics**: Open Interest, Funding Rates Heatmap, Long/Short ratios, Options Implied Volatility (IV), and Put/Call ratios.
+- **Liquidation Heatmap**: Estimated leverage liquidation clusters (10x, 25x, 50x, 100x), historical liquidation spikes, and proximity alerts.
 
-3. **Start local development server**:
-   ```bash
-   npm run dev
-   ```
-   Open `http://localhost:3000` in your browser.
+### 8. 🎯 Market Scanner & Custom Screeners
+- **Multi-Condition Rules Engine**: Combine Price (RSI overbought/oversold, MACD crossover, EMA breakouts), Volume (Spikes > 200%), Derivatives (Funding spikes, OI surge), and On-chain conditions using AND/OR logic.
+- **Opportunity Discovery**: Automatically surfaces volume anomalies, oversold setups, whale accumulation, and multi-timeframe confluence setups.
 
-4. **Run Unit Tests**:
-   ```bash
-   npm run test
-   ```
+### 9. 💼 Portfolio Tracker, Paper Trading & Backtesting
+- **Portfolio Management & Risk Analytics**: Track holdings, entry prices, realized/unrealized P&L, Sharpe ratio, Sortino ratio, Max Drawdown, Beta, VaR 95%, and Sector Exposure warnings.
+- **Paper Trading Terminal**: Virtual $100,000 simulated account with Market, Limit, and Stop orders.
+- **Strategy Backtester**: Backtest technical strategies with equity growth curves, win rates, and profit factors.
 
-5. **Build for Production / GitHub Pages**:
-   ```bash
-   npm run build
-   ```
+### 10. 🤖 AI Crypto Research Assistant & Asset Reports
+- **AI Analyst**: Interactive research assistant for instant queries ("Why is BTC moving?", "Find coins with whale accumulation", "Compare ETH vs SOL").
+- **Automated Research Reports**: Downloadable research summary cards for any supported asset.
 
 ---
 
-## 🔒 Security & Deployment
+## 🛠 Tech Stack
 
-- **GitHub Pages Static Hosting**: Frontend code runs purely client-side without exposing API keys or secrets in JavaScript bundles.
-- **Environment Variables**: Configure non-sensitive API endpoints in `.env`.
-- **GitHub Actions Workflow**: Included in `.github/workflows/deploy.yml` for automated testing, building, and deployment to GitHub Pages.
+- **Framework**: React 19 + TypeScript + Vite
+- **Styling**: Tailwind CSS v4 + Lucide Icons + Motion
+- **Charting**: Lightweight Charts v5
+- **Architecture**: Modular Client & Server State Engines with LocalStorage Persistence
 
 ---
 
-## ⚠️ Trading Risk Disclaimer
+Made With ❤️ By DroidMG. Proudly Made In India 🇮🇳
 
-This software is designed solely for quantitative market analysis, educational research, and financial data visualization. It does not constitute investment advice or trading recommendations. Past performance backtests do not guarantee future live trading results.

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   createChart,
   IChartApi,
@@ -13,7 +13,16 @@ import {
   SeriesMarker,
 } from 'lightweight-charts';
 import { tradingStore } from '../../store/tradingStore';
-import { calculateEMA, calculateVWAP, calculateBollingerBands } from '../../indicators/indicatorsEngine';
+import {
+  calculateEMA,
+  calculateVWAP,
+  calculateBollingerBands,
+  calculateSupertrend,
+  calculatePivotPoints,
+  calculateFibonacciLevels,
+} from '../../indicators/indicatorsEngine';
+import { calculateHeikinAshi } from '../../utils/heikinAshi';
+import { formatPrice } from '../../utils/formatters';
 
 export const TradingChart: React.FC = () => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -32,8 +41,13 @@ export const TradingChart: React.FC = () => {
   const bbMiddleSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const bbLowerSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
 
+  const supertrendSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+
   // Price Lines Ref
   const priceLinesRef = useRef<IPriceLine[]>([]);
+
+  // Local state for HTML top legend
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -70,7 +84,7 @@ export const TradingChart: React.FC = () => {
 
     chartRef.current = chart;
 
-    // 1. Candlestick series
+    // 1. Candlestick series (Prominent live price scale label)
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#10b981',
       downColor: '#f43f5e',
@@ -92,60 +106,72 @@ export const TradingChart: React.FC = () => {
     });
     volumeSeriesRef.current = volumeSeries;
 
-    // 3. EMA Line series
+    // 3. EMA Line series - NO TITLE to prevent text boxes on chart canvas!
     ema20SeriesRef.current = chart.addSeries(LineSeries, {
-      color: '#3b82f6', // Blue
+      color: '#3b82f6',
       lineWidth: 1,
       priceLineVisible: false,
-      lastValueVisible: true,
-      title: 'EMA 20',
+      lastValueVisible: false,
+      title: '',
     });
 
     ema50SeriesRef.current = chart.addSeries(LineSeries, {
-      color: '#f59e0b', // Amber
+      color: '#f59e0b',
       lineWidth: 1,
       priceLineVisible: false,
-      lastValueVisible: true,
-      title: 'EMA 50',
+      lastValueVisible: false,
+      title: '',
     });
 
     ema200SeriesRef.current = chart.addSeries(LineSeries, {
-      color: '#ec4899', // Pink
+      color: '#ec4899',
       lineWidth: 2,
       priceLineVisible: false,
-      lastValueVisible: true,
-      title: 'EMA 200',
+      lastValueVisible: false,
+      title: '',
     });
 
-    // 4. VWAP Line series
+    // 4. VWAP Line series - NO TITLE
     vwapSeriesRef.current = chart.addSeries(LineSeries, {
-      color: '#8b5cf6', // Purple
+      color: '#8b5cf6',
       lineWidth: 2,
       priceLineVisible: false,
-      lastValueVisible: true,
-      title: 'VWAP',
+      lastValueVisible: false,
+      title: '',
     });
 
-    // 5. Bollinger Bands Series
+    // 5. Bollinger Bands Series - NO TITLE
     bbUpperSeriesRef.current = chart.addSeries(LineSeries, {
       color: '#06b6d4',
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
-      title: 'BB Upper',
+      lastValueVisible: false,
+      title: '',
     });
     bbMiddleSeriesRef.current = chart.addSeries(LineSeries, {
       color: '#38bdf8',
       lineWidth: 1,
       priceLineVisible: false,
-      title: 'BB Middle',
+      lastValueVisible: false,
+      title: '',
     });
     bbLowerSeriesRef.current = chart.addSeries(LineSeries, {
       color: '#06b6d4',
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
-      title: 'BB Lower',
+      lastValueVisible: false,
+      title: '',
+    });
+
+    // 6. Supertrend Series - NO TITLE
+    supertrendSeriesRef.current = chart.addSeries(LineSeries, {
+      color: '#10b981',
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      title: '',
     });
 
     // Resize Observer
@@ -174,20 +200,29 @@ export const TradingChart: React.FC = () => {
       bbUpperSeriesRef.current = null;
       bbMiddleSeriesRef.current = null;
       bbLowerSeriesRef.current = null;
+      supertrendSeriesRef.current = null;
     };
   }, []);
 
   // Update candle data & overlays whenever store updates
   useEffect(() => {
     return tradingStore.subscribe(() => {
+      setTick((t) => t + 1);
+
       if (!candlestickSeriesRef.current || !volumeSeriesRef.current) return;
 
       const symbol = tradingStore.selectedSymbol;
-      const candles = tradingStore.candlesMap.get(symbol) || [];
-      if (candles.length === 0) return;
+      const rawCandles = tradingStore.candlesMap.get(symbol) || [];
+      if (rawCandles.length === 0) return;
 
       const overlays = tradingStore.overlayToggles;
       const smc = tradingStore.smcAnalysis;
+      const cCandlePatterns = tradingStore.candlestickPatterns;
+      const cChartPatterns = tradingStore.chartPatterns;
+      const chartType = tradingStore.chartType;
+
+      // Decide whether to render standard Candlesticks or Heikin-Ashi
+      const candles = chartType === 'heikinAshi' ? calculateHeikinAshi(rawCandles) : rawCandles;
 
       // Candlestick Data
       const chartCandles: CandlestickData<Time>[] = candles.map((c) => ({
@@ -200,7 +235,7 @@ export const TradingChart: React.FC = () => {
 
       // Volume Data
       const chartVolume = overlays.volume
-        ? candles.map((c) => ({
+        ? rawCandles.map((c) => ({
             time: c.time as Time,
             value: c.volume,
             color: c.close >= c.open ? 'rgba(16, 185, 129, 0.25)' : 'rgba(244, 63, 94, 0.25)',
@@ -210,7 +245,7 @@ export const TradingChart: React.FC = () => {
       candlestickSeriesRef.current.setData(chartCandles);
       volumeSeriesRef.current.setData(chartVolume);
 
-      const closes = candles.map((c) => c.close);
+      const closes = rawCandles.map((c) => c.close);
 
       // --- 1. EMA Overlay ---
       if (overlays.ema) {
@@ -222,7 +257,7 @@ export const TradingChart: React.FC = () => {
         const ema50Data: LineData<Time>[] = [];
         const ema200Data: LineData<Time>[] = [];
 
-        candles.forEach((c, i) => {
+        rawCandles.forEach((c, i) => {
           if (ema20Values[i] !== null) ema20Data.push({ time: c.time as Time, value: ema20Values[i]! });
           if (ema50Values[i] !== null) ema50Data.push({ time: c.time as Time, value: ema50Values[i]! });
           if (ema200Values[i] !== null) ema200Data.push({ time: c.time as Time, value: ema200Values[i]! });
@@ -239,9 +274,9 @@ export const TradingChart: React.FC = () => {
 
       // --- 2. VWAP Overlay ---
       if (overlays.vwap) {
-        const vwapValues = calculateVWAP(candles);
+        const vwapValues = calculateVWAP(rawCandles);
         const vwapData: LineData<Time>[] = [];
-        candles.forEach((c, i) => {
+        rawCandles.forEach((c, i) => {
           if (vwapValues[i] !== null) vwapData.push({ time: c.time as Time, value: vwapValues[i]! });
         });
         vwapSeriesRef.current?.setData(vwapData);
@@ -256,7 +291,7 @@ export const TradingChart: React.FC = () => {
         const midData: LineData<Time>[] = [];
         const lowerData: LineData<Time>[] = [];
 
-        candles.forEach((c, i) => {
+        rawCandles.forEach((c, i) => {
           if (bb.upper[i] !== null) upperData.push({ time: c.time as Time, value: bb.upper[i]! });
           if (bb.middle[i] !== null) midData.push({ time: c.time as Time, value: bb.middle[i]! });
           if (bb.lower[i] !== null) lowerData.push({ time: c.time as Time, value: bb.lower[i]! });
@@ -271,7 +306,19 @@ export const TradingChart: React.FC = () => {
         bbLowerSeriesRef.current?.setData([]);
       }
 
-      // --- 4. Price Lines & Markers Clean / Re-render ---
+      // --- 4. Supertrend Overlay ---
+      if (overlays.supertrend) {
+        const st = calculateSupertrend(rawCandles);
+        const stData: LineData<Time>[] = [];
+        rawCandles.forEach((c, i) => {
+          if (st[i] !== null) stData.push({ time: c.time as Time, value: st[i]!.value });
+        });
+        supertrendSeriesRef.current?.setData(stData);
+      } else {
+        supertrendSeriesRef.current?.setData([]);
+      }
+
+      // --- 5. Clean Price Lines ---
       priceLinesRef.current.forEach((pl) => {
         try {
           candlestickSeriesRef.current?.removePriceLine(pl);
@@ -281,10 +328,10 @@ export const TradingChart: React.FC = () => {
       });
       priceLinesRef.current = [];
 
-      const validTimesSet = new Set(candles.map((c) => c.time));
+      const validTimesSet = new Set(rawCandles.map((c) => c.time));
       const markers: SeriesMarker<Time>[] = [];
 
-      // --- Order Blocks Overlay ---
+      // --- Order Blocks Overlay (axisLabelVisible: FALSE) ---
       if (overlays.orderBlocks && smc?.orderBlocks) {
         smc.orderBlocks.forEach((ob) => {
           const color = ob.bias === 'Bullish' ? '#10b981' : '#f43f5e';
@@ -294,16 +341,16 @@ export const TradingChart: React.FC = () => {
             color,
             lineWidth: 1,
             lineStyle: 2,
-            axisLabelVisible: true,
-            title: `${ob.bias.toUpperCase()} OB (${ob.timeframe})`,
+            axisLabelVisible: false,
+            title: ``,
           });
           const plBot = candlestickSeriesRef.current?.createPriceLine({
             price: ob.bottom,
             color,
             lineWidth: 1,
             lineStyle: 2,
-            axisLabelVisible: true,
-            title: `${ob.bias.toUpperCase()} OB LOW`,
+            axisLabelVisible: false,
+            title: ``,
           });
 
           if (plTop) priceLinesRef.current.push(plTop);
@@ -321,7 +368,7 @@ export const TradingChart: React.FC = () => {
         });
       }
 
-      // --- Fair Value Gaps Overlay ---
+      // --- Fair Value Gaps Overlay (axisLabelVisible: FALSE) ---
       if (overlays.fvg && smc?.fairValueGaps) {
         smc.fairValueGaps.forEach((fvg) => {
           const color = fvg.bias === 'Bullish' ? '#06b6d4' : '#f59e0b';
@@ -331,16 +378,16 @@ export const TradingChart: React.FC = () => {
             color,
             lineWidth: 1,
             lineStyle: 1,
-            axisLabelVisible: true,
-            title: `${fvg.bias.toUpperCase()} FVG TOP`,
+            axisLabelVisible: false,
+            title: ``,
           });
           const plBot = candlestickSeriesRef.current?.createPriceLine({
             price: fvg.bottom,
             color,
             lineWidth: 1,
             lineStyle: 1,
-            axisLabelVisible: true,
-            title: `${fvg.bias.toUpperCase()} FVG BOT`,
+            axisLabelVisible: false,
+            title: ``,
           });
 
           if (plTop) priceLinesRef.current.push(plTop);
@@ -358,7 +405,7 @@ export const TradingChart: React.FC = () => {
         });
       }
 
-      // --- Liquidity Levels Overlay ---
+      // --- Liquidity Levels Overlay (axisLabelVisible: FALSE) ---
       if (overlays.liquidity && smc?.liquidityLevels) {
         smc.liquidityLevels.forEach((lvl) => {
           const color = lvl.bias === 'Buy-side' ? '#a855f7' : '#ec4899';
@@ -368,8 +415,8 @@ export const TradingChart: React.FC = () => {
             color,
             lineWidth: 1,
             lineStyle: 3,
-            axisLabelVisible: true,
-            title: `${lvl.type}`,
+            axisLabelVisible: false,
+            title: ``,
           });
           if (pl) priceLinesRef.current.push(pl);
 
@@ -385,7 +432,7 @@ export const TradingChart: React.FC = () => {
         });
       }
 
-      // --- BOS & CHoCH Structure Breaks Overlay ---
+      // --- Structure Breaks (BOS / CHoCH) Overlay (axisLabelVisible: FALSE) ---
       if (smc?.structureBreaks) {
         smc.structureBreaks.forEach((brk) => {
           const showBreak = (brk.type === 'BOS' && overlays.bos) || (brk.type === 'CHoCH' && overlays.choch);
@@ -398,8 +445,8 @@ export const TradingChart: React.FC = () => {
             color,
             lineWidth: 1,
             lineStyle: 1,
-            axisLabelVisible: true,
-            title: `${brk.bias.toUpperCase()} ${brk.type}`,
+            axisLabelVisible: false,
+            title: ``,
           });
           if (pl) priceLinesRef.current.push(pl);
 
@@ -415,29 +462,28 @@ export const TradingChart: React.FC = () => {
         });
       }
 
-      // --- Support & Resistance Overlay ---
+      // --- Support & Resistance Overlay (axisLabelVisible: FALSE) ---
       if (overlays.supportResistance && smc?.swings) {
         const recentSwings = smc.swings.slice(-6);
         recentSwings.forEach((s) => {
           const isRes = s.type === 'HH' || s.type === 'LH';
           const color = isRes ? '#f43f5e' : '#10b981';
-          const title = isRes ? `RES` : `SUP`;
 
           const pl = candlestickSeriesRef.current?.createPriceLine({
             price: s.price,
             color,
             lineWidth: 1,
             lineStyle: 2,
-            axisLabelVisible: true,
-            title: `${title} (${s.price.toFixed(2)})`,
+            axisLabelVisible: false,
+            title: ``,
           });
           if (pl) priceLinesRef.current.push(pl);
         });
       }
 
-      // --- Session Levels Overlay ---
-      if (overlays.sessionLevels && candles.length >= 20) {
-        const recent20 = candles.slice(-20);
+      // --- Session Levels Overlay (axisLabelVisible: FALSE) ---
+      if (overlays.sessionLevels && rawCandles.length >= 20) {
+        const recent20 = rawCandles.slice(-20);
         const high20 = Math.max(...recent20.map((c) => c.high));
         const low20 = Math.min(...recent20.map((c) => c.low));
 
@@ -446,26 +492,137 @@ export const TradingChart: React.FC = () => {
           color: '#3b82f6',
           lineWidth: 1,
           lineStyle: 2,
-          axisLabelVisible: true,
-          title: 'SESSION HIGH',
+          axisLabelVisible: false,
+          title: '',
         });
         const plLow = candlestickSeriesRef.current?.createPriceLine({
           price: low20,
           color: '#3b82f6',
           lineWidth: 1,
           lineStyle: 2,
-          axisLabelVisible: true,
-          title: 'SESSION LOW',
+          axisLabelVisible: false,
+          title: '',
         });
 
         if (plHigh) priceLinesRef.current.push(plHigh);
         if (plLow) priceLinesRef.current.push(plLow);
       }
 
+      // --- Pivot Points Overlay (axisLabelVisible: FALSE) ---
+      if (overlays.pivotPoints) {
+        const pivots = calculatePivotPoints(rawCandles);
+        if (pivots) {
+          const plP = candlestickSeriesRef.current?.createPriceLine({
+            price: pivots.pivot,
+            color: '#eab308',
+            lineWidth: 1,
+            lineStyle: 1,
+            axisLabelVisible: false,
+            title: '',
+          });
+          const plR1 = candlestickSeriesRef.current?.createPriceLine({
+            price: pivots.r1,
+            color: '#f43f5e',
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: false,
+            title: '',
+          });
+          const plS1 = candlestickSeriesRef.current?.createPriceLine({
+            price: pivots.s1,
+            color: '#10b981',
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: false,
+            title: '',
+          });
+
+          if (plP) priceLinesRef.current.push(plP);
+          if (plR1) priceLinesRef.current.push(plR1);
+          if (plS1) priceLinesRef.current.push(plS1);
+        }
+      }
+
+      // --- Fibonacci Retracement Levels (axisLabelVisible: FALSE) ---
+      if (overlays.fibonacci) {
+        const fibs = calculateFibonacciLevels(rawCandles);
+        if (fibs) {
+          const fib50 = candlestickSeriesRef.current?.createPriceLine({
+            price: fibs.fib500,
+            color: '#6366f1',
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: false,
+            title: '',
+          });
+          const fib618 = candlestickSeriesRef.current?.createPriceLine({
+            price: fibs.fib618,
+            color: '#f59e0b',
+            lineWidth: 1,
+            lineStyle: 1,
+            axisLabelVisible: false,
+            title: '',
+          });
+
+          if (fib50) priceLinesRef.current.push(fib50);
+          if (fib618) priceLinesRef.current.push(fib618);
+        }
+      }
+
+      // --- Candlestick Patterns Markers ---
+      if (overlays.candlestickPatterns && cCandlePatterns) {
+        cCandlePatterns.forEach((cp) => {
+          if (validTimesSet.has(cp.time)) {
+            const isBull = cp.type === 'Bullish';
+            const isBear = cp.type === 'Bearish';
+            let shape: 'arrowUp' | 'arrowDown' | 'circle' | 'square' = isBull ? 'arrowUp' : isBear ? 'arrowDown' : 'circle';
+            let color = isBull ? '#10b981' : isBear ? '#f43f5e' : '#eab308';
+
+            markers.push({
+              time: cp.time as Time,
+              position: isBull ? 'belowBar' : 'aboveBar',
+              color,
+              shape,
+              text: `🕯️ ${cp.name}`,
+            });
+          }
+        });
+      }
+
+      // --- Chart Patterns Markers ---
+      if (overlays.chartPatterns && cChartPatterns) {
+        cChartPatterns.forEach((cp) => {
+          if (validTimesSet.has(cp.time)) {
+            const isBull = cp.type === 'Bullish';
+            let color = isBull ? '#10b981' : '#f43f5e';
+
+            markers.push({
+              time: cp.time as Time,
+              position: isBull ? 'belowBar' : 'aboveBar',
+              color,
+              shape: isBull ? 'arrowUp' : 'arrowDown',
+              text: `📐 ${cp.name}`,
+            });
+
+            if (cp.necklineOrBoundary) {
+              const pl = candlestickSeriesRef.current?.createPriceLine({
+                price: cp.necklineOrBoundary,
+                color,
+                lineWidth: 1,
+                lineStyle: 1,
+                axisLabelVisible: false,
+                title: '',
+              });
+              if (pl) priceLinesRef.current.push(pl);
+            }
+          }
+        });
+      }
+
       // Sort markers chronologically (mandatory for lightweight-charts)
       markers.sort((a, b) => (a.time as number) - (b.time as number));
 
-      // Set markers on candlestick series
+      // Set markers on candlestick series safely
       try {
         candlestickSeriesRef.current.setMarkers(markers);
       } catch {
@@ -475,28 +632,77 @@ export const TradingChart: React.FC = () => {
   }, []);
 
   const smc = tradingStore.smcAnalysis;
+  const indicators = tradingStore.indicatorValues;
+  const symbol = tradingStore.selectedSymbol;
+  const candles = tradingStore.candlesMap.get(symbol) || [];
+  const latestCandle = candles.length > 0 ? candles[candles.length - 1] : null;
 
   return (
-    <div className="relative w-full h-full min-h-[420px] bg-[#0c0e14]">
-      <div ref={chartContainerRef} className="w-full h-full" />
+    <div className="relative w-full h-full min-h-[420px] bg-[#0c0e14] flex flex-col">
+      {/* HTML Header Bar - Sleek Legend, OHLCV + Indicator Values Badges */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-[#121622]/90 border-b border-slate-800/80 text-[11px] font-mono z-10 select-none">
+        {/* Left: Active Chart Mode & Live OHLCV */}
+        <div className="flex items-center gap-3">
+          <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-bold uppercase">
+            {tradingStore.chartType === 'heikinAshi' ? 'HEIKIN-ASHI 📊' : 'CANDLESTICK 🕯️'}
+          </span>
 
-      {/* SMC Overlay Status Badges */}
-      {smc && (
-        <div className="absolute top-3 left-3 pointer-events-none flex flex-wrap gap-2 text-[10px] font-mono z-10">
-          <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
-            STRUCTURE: <span className={smc.overallBias === 'Bullish' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{smc.overallBias.toUpperCase()}</span>
-          </div>
-          <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
-            ZONE: <span className="text-indigo-400 font-bold">{smc.dealingRange.currentZone}</span>
-          </div>
-          <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
-            ACTIVE OBs: <span className="text-amber-400 font-bold">{smc.orderBlocks.length}</span>
-          </div>
-          <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
-            ACTIVE FVGs: <span className="text-cyan-400 font-bold">{smc.fairValueGaps.length}</span>
-          </div>
+          {latestCandle && (
+            <div className="hidden sm:flex items-center gap-2.5 text-slate-300">
+              <span>O: <strong className="text-slate-100">{formatPrice(latestCandle.open)}</strong></span>
+              <span>H: <strong className="text-emerald-400">{formatPrice(latestCandle.high)}</strong></span>
+              <span>L: <strong className="text-rose-400">{formatPrice(latestCandle.low)}</strong></span>
+              <span>C: <strong className="text-slate-100">{formatPrice(latestCandle.close)}</strong></span>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Right: Live Technical Indicator Values Badges (EMA, VWAP, Supertrend) */}
+        {indicators && (
+          <div className="flex flex-wrap items-center gap-2 text-[10px]">
+            {tradingStore.overlayToggles.ema && indicators.ema[20] !== null && indicators.ema[20] !== undefined && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                <span className="text-blue-400">E20: {formatPrice(indicators.ema[20])}</span>
+              </div>
+            )}
+            {tradingStore.overlayToggles.vwap && indicators.vwap !== null && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                <span className="text-purple-400">VWAP: {formatPrice(indicators.vwap)}</span>
+              </div>
+            )}
+            {tradingStore.overlayToggles.supertrend && indicators.supertrend && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                <span className={indicators.supertrend.direction === 'up' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                  ST: {indicators.supertrend.direction === 'up' ? 'BULL' : 'BEAR'} ({formatPrice(indicators.supertrend.value)})
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Main Chart Canvas Container */}
+      <div className="relative flex-1 w-full h-full">
+        <div ref={chartContainerRef} className="w-full h-full" />
+
+        {/* SMC Overlay Status Badges */}
+        {smc && (
+          <div className="absolute top-3 left-3 pointer-events-none flex flex-wrap gap-2 text-[10px] font-mono z-10">
+            <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
+              STRUCTURE: <span className={smc.overallBias === 'Bullish' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{smc.overallBias.toUpperCase()}</span>
+            </div>
+            <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
+              ZONE: <span className="text-indigo-400 font-bold">{smc.dealingRange.currentZone}</span>
+            </div>
+            <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
+              ACTIVE OBs: <span className="text-amber-400 font-bold">{smc.orderBlocks.length}</span>
+            </div>
+            <div className="px-2.5 py-1 rounded-full bg-[#121622]/90 border border-slate-800 text-slate-300 backdrop-blur shadow-sm">
+              ACTIVE FVGs: <span className="text-cyan-400 font-bold">{smc.fairValueGaps.length}</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
