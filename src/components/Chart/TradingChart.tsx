@@ -224,23 +224,35 @@ export const TradingChart: React.FC = () => {
       // Decide whether to render standard Candlesticks or Heikin-Ashi
       const candles = chartType === 'heikinAshi' ? calculateHeikinAshi(rawCandles) : rawCandles;
 
-      // Candlestick Data
-      const chartCandles: CandlestickData<Time>[] = candles.map((c) => ({
-        time: c.time as Time,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }));
+      // Candlestick Data - Deduplicate and sort by ascending timestamp
+      const uniqueCandlesMap = new Map<number, CandlestickData<Time>>();
+      candles.forEach((c) => {
+        uniqueCandlesMap.set(c.time, {
+          time: c.time as Time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        });
+      });
+      const chartCandles = Array.from(uniqueCandlesMap.values()).sort(
+        (a, b) => (a.time as number) - (b.time as number)
+      );
 
       // Volume Data
-      const chartVolume = overlays.volume
-        ? rawCandles.map((c) => ({
+      const uniqueVolumeMap = new Map<number, { time: Time; value: number; color: string }>();
+      if (overlays.volume) {
+        rawCandles.forEach((c) => {
+          uniqueVolumeMap.set(c.time, {
             time: c.time as Time,
             value: c.volume,
             color: c.close >= c.open ? 'rgba(16, 185, 129, 0.25)' : 'rgba(244, 63, 94, 0.25)',
-          }))
-        : [];
+          });
+        });
+      }
+      const chartVolume = Array.from(uniqueVolumeMap.values()).sort(
+        (a, b) => (a.time as number) - (b.time as number)
+      );
 
       candlestickSeriesRef.current.setData(chartCandles);
       volumeSeriesRef.current.setData(chartVolume);

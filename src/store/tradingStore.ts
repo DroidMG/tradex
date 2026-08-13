@@ -390,11 +390,25 @@ class TradingStore {
     this.notify();
   }
 
-  private initializeSymbol(symbol: string) {
-    const candles = generateHistoricalCandles(symbol, this.selectedTimeframe, 200);
-    this.candlesMap.set(symbol, candles);
+  private async initializeSymbol(symbol: string) {
+    // Seed benchmark
+    const initialSeed = generateHistoricalCandles(symbol, this.selectedTimeframe, 200);
+    this.candlesMap.set(symbol, initialSeed);
+    this.recalculateAll();
 
-    this.aggregator = new CandleAggregator({ [this.selectedTimeframe]: candles });
+    // Fetch real historical Klines from Binance API or Provider
+    try {
+      const realCandles = await this.provider.getHistoricalCandles(symbol, this.selectedTimeframe, 200);
+      if (realCandles && realCandles.length > 0) {
+        this.candlesMap.set(symbol, realCandles);
+      }
+    } catch (e) {
+      console.warn('Failed to load real historical klines:', e);
+    }
+
+    const currentCandles = this.candlesMap.get(symbol) || [];
+
+    this.aggregator = new CandleAggregator({ [this.selectedTimeframe]: currentCandles });
 
     this.aggregator.subscribe(this.selectedTimeframe, (updatedCandle) => {
       const currentArr = this.candlesMap.get(symbol) || [];
@@ -411,6 +425,7 @@ class TradingStore {
     });
 
     this.recalculateAll();
+    this.notify();
   }
 
   private recalculateAll() {

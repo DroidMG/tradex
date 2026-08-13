@@ -37,6 +37,37 @@ const BINANCE_SYMBOL_MAP: Record<string, string> = {
   XRPUSDT: 'XRP/USD',
 };
 
+const BINANCE_REVERSE_SYMBOL_MAP: Record<string, string> = {
+  'BTC/USD': 'BTCUSDT',
+  'ETH/USD': 'ETHUSDT',
+  'SOL/USD': 'SOLUSDT',
+  'AVAX/USD': 'AVAXUSDT',
+  'SUI/USD': 'SUIUSDT',
+  'ARB/USD': 'ARBUSDT',
+  'OP/USD': 'OPUSDT',
+  'FET/USD': 'FETUSDT',
+  'RENDER/USD': 'RENDERUSDT',
+  'UNI/USD': 'UNIUSDT',
+  'AAVE/USD': 'AAVEUSDT',
+  'DOGE/USD': 'DOGEUSDT',
+  'PEPE/USD': 'PEPEUSDT',
+  'ONDO/USD': 'ONDOUSDT',
+  'BNB/USD': 'BNBUSDT',
+  'XRP/USD': 'XRPUSDT',
+};
+
+const TIMEFRAME_TO_BINANCE: Record<Timeframe, string> = {
+  '1m': '1m',
+  '3m': '3m',
+  '5m': '5m',
+  '15m': '15m',
+  '30m': '30m',
+  '1H': '1h',
+  '4H': '4h',
+  '1D': '1d',
+  '1W': '1w',
+};
+
 export class RealtimeLiveProvider implements MarketDataProvider {
   id = 'realtime_live';
   name = 'Real-Time Global Market Stream (WebSocket + Crypto.com)';
@@ -109,7 +140,49 @@ export class RealtimeLiveProvider implements MarketDataProvider {
   }
 
   async getHistoricalCandles(symbol: string, timeframe: Timeframe, count = 200): Promise<Candle[]> {
-    return generateHistoricalCandles(symbol, timeframe, count);
+    const binancePair = BINANCE_REVERSE_SYMBOL_MAP[symbol];
+    const interval = TIMEFRAME_TO_BINANCE[timeframe] || '15m';
+
+    if (binancePair) {
+      try {
+        const url = `https://api.binance.com/api/v3/klines?symbol=${binancePair}&interval=${interval}&limit=${count}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const state = this.symbolStates.get(symbol);
+            const decimals = state?.decimals ?? (symbol.includes('PEPE') ? 8 : 2);
+
+            const candles: Candle[] = data.map((item: any) => ({
+              time: Math.floor(item[0] / 1000),
+              open: Number(parseFloat(item[1]).toFixed(decimals)),
+              high: Number(parseFloat(item[2]).toFixed(decimals)),
+              low: Number(parseFloat(item[3]).toFixed(decimals)),
+              close: Number(parseFloat(item[4]).toFixed(decimals)),
+              volume: Number(parseFloat(item[5]).toFixed(2)),
+            }));
+
+            // Sync symbol state lastPrice with the last candle close from Binance
+            const lastCandle = candles[candles.length - 1];
+            if (state && lastCandle) {
+              state.lastPrice = lastCandle.close;
+            }
+
+            return candles;
+          }
+        }
+      } catch (err) {
+        console.warn('Binance klines fetch failed, falling back to benchmark:', err);
+      }
+    }
+
+    // Fallback for non-crypto or API offline
+    const fallbackCandles = generateHistoricalCandles(symbol, timeframe, count);
+    const state = this.symbolStates.get(symbol);
+    if (state && fallbackCandles.length > 0) {
+      state.lastPrice = fallbackCandles[fallbackCandles.length - 1].close;
+    }
+    return fallbackCandles;
   }
 
   subscribe(symbols: string[], callback: TickCallback): void {
@@ -315,12 +388,15 @@ export class RealtimeLiveProvider implements MarketDataProvider {
       const state = this.symbolStates.get(sym);
       if (!state) return;
 
-      // For non-crypto assets or during micro-intervals between WebSocket messages, apply realistic micro-ticks
-      const isForex = sym.includes('EUR') || sym.includes('GBP') || sym.includes('AUD') || sym.includes('JPY');
-      const isCommodity = sym.includes('XAU') || sym.includes('WTI') || sym.includes('US100') || sym.includes('US500');
+      // If WS is connected for crypto, WebSocket updates state.lastPrice directly with exact real Binance trades
+      if (state.isCrypto && this.wsConnected) {
+        this.broadcastTick(state);
+        return;
+      }
 
-      // Micro stochastic fluctuation
-      const volMultiplier = state.isCrypto ? 0.0002 : isForex ? 0.00004 : 0.0001;
+      // For non-crypto assets (Forex/Commodities) or offline fallback, apply realistic micro ticks
+      const isForex = sym.includes('EUR') || sym.includes('GBP') || sym.includes('AUD') || sym.includes('JPY');
+      const volMultiplier = isForex ? 0.00003 : 0.00008;
       const direction = Math.random() > 0.49 ? 1 : -1;
       const stepPct = direction * Math.random() * volMultiplier;
 
@@ -328,7 +404,9 @@ export class RealtimeLiveProvider implements MarketDataProvider {
       newPrice = Number(newPrice.toFixed(state.decimals));
 
       state.lastPrice = newPrice;
-      state.change24hPct += stepPct * 2;
+      if (state.open24h > 0) {
+        state.change24hPct = ((newPrice - state.open24h) / state.open24h) * 100;
+      }
       if (newPrice > state.high24h) state.high24h = newPrice;
       if (newPrice < state.low24h) state.low24h = newPrice;
 

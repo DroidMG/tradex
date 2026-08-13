@@ -51,8 +51,8 @@ export const TopNavbar: React.FC = () => {
                 <span className="font-extrabold text-base tracking-wide bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
                   TradeX Terminal
                 </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-0.5">
-                  <Sparkles className="w-2.5 h-2.5" /> FREE
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                  PRO
                 </span>
               </div>
               <span className="text-[10px] text-slate-400 font-medium tracking-wider flex items-center gap-1">
